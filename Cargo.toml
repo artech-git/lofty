@@ -1,0 +1,21 @@
+[package]
+name = "lofty"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = { version = "0.7.2", features = ["http2", "multipart", "http1"] }
+axum-core = "0.4.1"
+bytes = "1.5.0"
+dashmap = "5.5.3"
+futures = "0.3.29"
+futures-stream = "0.0.0"
+http-error-derive = "0.3.2"
+json = "0.12.4"
+serde = { version = "1.0.193", features = ["derive"] }
+thiserror = "1.0.51"
+tokio = { version = "1.35.1", features = ["full"] }
+tokio-stream = "0.1.14"
+uuid = { version = "1.6.1", features = ["v4", "fast-rng", "serde"] }
