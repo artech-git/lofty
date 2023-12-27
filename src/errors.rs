@@ -1,4 +1,4 @@
-use std::{panic::Location, backtrace::Backtrace};
+use std::{panic::Location, backtrace::Backtrace, borrow::Cow};
 
 use axum::{http::{StatusCode, HeaderMap, Response, self, HeaderValue},response::IntoResponse, body::Body};
 use thiserror::Error;
@@ -17,6 +17,24 @@ use std::convert::From;
 //         self.into_report()
 //     }
 // }
+
+pub trait OptionExt<V, E, T>
+{ 
+    fn to_result(self, method: T) -> Result<V, E>; 
+}
+
+impl<V, E, T> OptionExt<V, E, T> for Option<V> 
+
+where  
+        E: Into<ErrorStates>,
+        T: FnOnce() -> E
+{ 
+    fn to_result(self, method: T) -> Result<V, E>
+    {
+        let err = method(); 
+        Err(err)
+    }   
+}
 
 #[derive(Debug)]
 pub struct ErrorReport { 
@@ -125,6 +143,11 @@ pub enum ErrorStates {
     InternalError(#[from] axum::Error),
 
     
+    #[http(code = 404, message = "Missing Header Field")]
+    #[error("Missing header field")]
+    RequestError(#[from] HeaderErrors<'static>),
+
+    
     // #[http(code = 500, message = "server went into undesired mode")]
     // #[error("internal socket Error")]
     // SocketError(#[from] ),
@@ -138,3 +161,32 @@ pub enum ErrorStates {
     
 
 }
+
+
+#[derive(Debug, thiserror::Error, HttpError)]
+pub enum HeaderErrors<'a> {
+
+    #[error("Missing header field: {0:?}")]
+    HeaderFieldMissing(Cow<'a, str>),
+
+    #[error("Field mismatch: {0:?}")]
+    FieldMismatch(Cow<'a, str>),
+
+    #[error("Invalid field input: {0:?}")]
+    InvalidField(Cow<'a, str>),
+
+    #[error("Invalid field input: {0:?}")]
+    HeaderUnwrapError(#[from] http::header::ToStrError),
+
+    // #[error("Invalid field input: {0:?}")]
+    // InvalidField(Cow<'a, str>)
+}
+
+
+// impl<'a, T> std::convert::From<T> for HeaderErrors<'a>
+// where T: std::error::Error { 
+
+//     fn from(val: T) -> Self { 
+//         val.into()
+//     }
+// }

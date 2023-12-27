@@ -6,7 +6,8 @@ use tokio::fs::File;
 use tokio::io::BufWriter;  
 
 use crate::FragmentError;
-use crate::handlers::{JobHandle, init_upload_process, task_progress};
+use crate::config::LoadConfig;
+use crate::handlers::{JobHandle, init_upload_process, task_progress, resume_upload};
 
 
 pub async fn create_router( 
@@ -16,7 +17,8 @@ pub async fn create_router(
     let router = Router::new()
         .route("/upload_file", get(init_upload_process))
         .route("/status", get(task_progress))
-        .layer(Extension(ext)); 
+        .route("/resume_upload", get(resume_upload))
+        .layer(Extension(ext));  
 
     Ok(router)
 }
@@ -31,4 +33,8 @@ pub async fn generate_file(path: impl AsRef<Path>, size: usize) -> Result<BufWri
     let file =  File::create(path).await?;
     let buffered_file = BufWriter::with_capacity(size, file); 
     Ok(buffered_file)
+}
+
+pub async fn load_config(path: impl AsRef<str>) -> Result<LoadConfig, FragmentError>  {
+    Ok()
 }

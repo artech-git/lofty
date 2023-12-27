@@ -9,6 +9,7 @@ edition = "2021"
 axum = { version = "0.7.2", features = ["http2", "multipart", "http1"] }
 axum-core = "0.4.1"
 bytes = "1.5.0"
+config = "0.13.4"
 dashmap = "5.5.3"
 futures = "0.3.29"
 futures-stream = "0.0.0"

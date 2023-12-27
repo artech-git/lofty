@@ -9,9 +9,10 @@ mod file;
 mod errors;
 mod utils; 
 mod handlers;
+mod authorization;
+mod config;
 
-#[tokio::main]
-async fn main() -> Result<(), FragmentError> { 
+async fn tokio_main() -> Result<(), FragmentError> { 
 
     let addr = [0_u8; 4].into(); 
     let port = 2053; 
@@ -38,5 +39,14 @@ async fn main() -> Result<(), FragmentError> {
     Ok(())
 }
 
+fn main() {
+    let mut runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .global_queue_interval(40)
+        .build()
+        .unwrap();
 
-
+    let tokio_main_process = tokio_main(); 
+    
+    runtime.block_on(tokio_main_process);
+}
