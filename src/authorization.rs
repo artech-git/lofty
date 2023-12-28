@@ -19,7 +19,7 @@ pub async fn ensure_headers(mut headers: &HeaderMap) -> Result<(), FragmentError
     };
 
 
-    Ok(header_value)
+    Ok(())
 
 }
 

@@ -636,6 +636,7 @@ dependencies = [
  "futures-stream",
  "http-error-derive",
  "json",
+ "scopeguard",
  "serde",
  "thiserror",
  "tokio",

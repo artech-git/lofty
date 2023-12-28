@@ -11,7 +11,7 @@ use crate::handlers::{JobHandle, init_upload_process, task_progress, resume_uplo
 
 
 pub async fn create_router( 
-    ext: JobHandle<FragmentError>
+    ext: JobHandle,
 ) -> Result<Router, FragmentError> { 
     
     let router = Router::new()
@@ -35,6 +35,6 @@ pub async fn generate_file(path: impl AsRef<Path>, size: usize) -> Result<BufWri
     Ok(buffered_file)
 }
 
-pub async fn load_config(path: impl AsRef<str>) -> Result<LoadConfig, FragmentError>  {
-    Ok()
-}
+// pub async fn load_config(path: impl AsRef<str>) -> Result<LoadConfig, FragmentError>  {
+//     Ok()
+// }

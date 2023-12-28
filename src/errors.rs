@@ -83,12 +83,14 @@ pub struct FragmentError {
     trace: Backtrace
 }
 
+unsafe impl std::marker::Send for FragmentError { }
 
 impl<'a, E> std::convert::From<E> for FragmentError
     where E: Into<ErrorStates>
 {
     #[track_caller]
     fn from(err: E) -> FragmentError {
+        
         Self { 
             // location: Location::caller().to_owned(), 
             // error: err, 
