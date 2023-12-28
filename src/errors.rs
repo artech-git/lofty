@@ -1,6 +1,6 @@
 use std::{panic::Location, backtrace::Backtrace, borrow::Cow};
 
-use axum::{http::{StatusCode, HeaderMap, Response, self, HeaderValue},response::IntoResponse, body::Body};
+use axum::{http::{StatusCode, HeaderMap, Response, self, HeaderValue, header::ToStrError},response::IntoResponse, body::Body};
 use thiserror::Error;
 
 use http_error_derive::HttpError;
@@ -85,12 +85,16 @@ pub struct FragmentError {
 
 unsafe impl std::marker::Send for FragmentError { }
 
+
 impl<'a, E> std::convert::From<E> for FragmentError
     where E: Into<ErrorStates>
 {
     #[track_caller]
     fn from(err: E) -> FragmentError {
-        
+
+        let loc = Location::caller(); 
+
+        println!("loc: {}", loc); 
         Self { 
             // location: Location::caller().to_owned(), 
             // error: err, 
@@ -127,10 +131,6 @@ impl<'a> FragmentError {
 #[derive(Debug, thiserror::Error, HttpError)]
 pub enum ErrorStates {
 
-    // // #[http(code = 500, message = "server went into undesired mode")]
-    // #[error("Internal I/O Error")] 
-    // IOError(#[from] std::io::Error), 
-
     #[http(code = 500, message = "server went into undesired mode")]
     #[error("Join Handle Error")]
     TaskError(#[from] tokio::task::JoinError),
@@ -148,6 +148,21 @@ pub enum ErrorStates {
     #[http(code = 404, message = "Missing Header Field")]
     #[error("Missing header field")]
     RequestError(#[from] HeaderErrors<'static>),
+
+    
+    #[http(code = 500, message = "string parsing error")]
+    #[error("internal parsing error")]
+    ConvertionErr(#[from] ToStrError),
+
+    
+    #[http(code = 404, message = "Invalid input recieved")]
+    #[error("invalid string present at")]
+    UuidConvertionErr(#[from] uuid::Error),
+
+    
+    #[http(code = 500, message = "Internal server error")]
+    #[error("axum error")]
+    AxumHttpError(#[from] axum::http::Error),
 
     
     // #[http(code = 500, message = "server went into undesired mode")]

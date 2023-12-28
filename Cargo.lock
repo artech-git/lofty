@@ -638,6 +638,7 @@ dependencies = [
  "json",
  "scopeguard",
  "serde",
+ "serde_json",
  "thiserror",
  "tokio",
  "tokio-stream",

@@ -86,7 +86,7 @@ pub mod file_drop_handler {
 
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum UploadState {
     UnInit, 
     Init, 
@@ -96,6 +96,7 @@ pub enum UploadState {
     Complete, 
     Failed, 
 }
+
 
 
 #[derive(Debug)]
