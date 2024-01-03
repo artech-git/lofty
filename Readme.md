@@ -1,7 +1,14 @@
 
 # Rust HTTP File Upload Handler
 
-![Alt](./assest/image.png)
+<!-- ![](./assest/image.png) -->
+<p align="center">
+<img src="./assest/image.png" width="150"/> 
+&nbsp;
+<img src="./assest/arrow.png" width="150"/> 
+&nbsp;
+<img src="./assest/data-server.png" width="150"/>
+</p>
 
 This project is designed to efficiently handle large HTTP file uploads, ranging from 6 to 14 gigabytes in size, while effectively scaling in high-traffic scenarios without overburdening file I/O operations. The system also ensures seamless reading of these uploaded files back through the HTTP endpoints. Built entirely in Rust programming language, utilizing the Tokio and Axum crates for high-performance asynchronous processing.
 
@@ -54,14 +61,7 @@ Refer to the `config.example.toml` file for an example configuration setup.
 
 ## Contributing
 
-Contributions are welcome! If you'd like to contribute to this project, please follow these steps:
-
-1. Fork the repository.
-2. Create your branch (`git checkout -b feature/your-feature`).
-3. Commit your changes (`git commit -am 'Add your feature'`).
-4. Push to the branch (`git push origin feature/your-feature`).
-5. Create a new Pull Request.
-
+Contributions are welcome! If you'd like to contribute to this project.
 
 ## Acknowledgments
 
