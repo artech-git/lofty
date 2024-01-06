@@ -170,6 +170,11 @@ pub enum ErrorStates {
     AxumHttpError(#[from] axum::http::Error),
 
     
+    #[http(code = 500, message = "Internal server error")]
+    #[error("Logical processing error")]
+    UndeclaredError,
+
+    
     // #[http(code = 500, message = "server went into undesired mode")]
     // #[error("internal socket Error")]
     // SocketError(#[from] ),

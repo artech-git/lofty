@@ -1,4 +1,4 @@
-use std::{sync::Arc, str::FromStr, borrow::Cow, io::Read, collections::HashMap};
+use std::{sync::Arc, str::FromStr, borrow::Cow, io::Read, collections::HashMap, convert::Infallible};
 
 use axum_core::response::IntoResponse;
 use bytes::Bytes;
@@ -8,7 +8,7 @@ use serde_json::json;
 use uuid::Uuid;
 use futures::stream::StreamExt;
 use tokio::io::AsyncWriteExt;
-use crate::{errors::{OptionExt, HeaderErrors}, authorization::extract_header_fields}; 
+use crate::{errors::{OptionExt, HeaderErrors, ErrorStates}, authorization::extract_header_fields}; 
 
 use crate::{file::{FileObject, UploadState}, utils::generate_file, FragmentError};
 
@@ -64,7 +64,7 @@ pub async fn schedule_upload_process(
     
     let mut resp = Response::builder(); 
     
-    if allocated_disk_space.is_none() || server_condition.is_none() {
+    let resp = if allocated_disk_space.is_none() || server_condition.is_none() {
 
         let mut status = "Denied"; 
 
@@ -77,7 +77,7 @@ pub async fn schedule_upload_process(
 
         let mut body = Body::from(json_body);
 
-        resp.body(body);
+        resp.body(body)
 
     }
     else { 
@@ -109,9 +109,11 @@ pub async fn schedule_upload_process(
         
         let mut body = Body::from(json_body);
         
-        resp.body(body);
+        resp.body(body)
         
-    } 
+    }.map_err(|_| { 
+        ErrorStates::UndeclaredError
+    })?;
 
     return Ok(resp); 
 }
