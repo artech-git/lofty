@@ -45,7 +45,6 @@ pub async fn schedule_upload_process(
     let headers_names = [
         // "FileName",
         "Content-Length",
-        "Content-Length",
     ];
 
     let mut extracted_headers = futures::future::join_all(headers_names
@@ -71,7 +70,7 @@ pub async fn schedule_upload_process(
 
         let mut json_body = serde_json::json!({
             "status" : status, 
-            "reason": "can't be given", 
+            "reason": "can't be given", //TODO: change the message type presented here
         });
 
         let json_body = serde_json::to_vec(&json_body).unwrap(); 
@@ -234,13 +233,35 @@ pub async fn init_upload_process(
     ext: Extension<JobHandle>,
     req: Request<Body>, 
 ) -> Result<Response<axum::body::Body>, FragmentError> {
+    /*
+        Request: 
+            headers: 
+                FileName
+                Content_Length
+                uuid: "xxxx-xxxx-xxxx-xxxx"
+            Body: 
+                Chunks, 128Mb
+                Chunks, 128Mb
+                Chunks, 128Mb
+                Chunks, 128Mb
+                Chunks, 128Mb
 
+        Response:
+            Status: 200 | 404 | 500
+            headers: 
+                ...
+            Body:
+                Json { 
+                    Status: Complete|Broke|Failed, 
+                }
+     */
     let (parts, body) = req.into_parts(); 
     let headers = parts.headers; 
 
     let headers_names = [
         "FileName",
         "Content-Length",
+        "uuid", 
     ];
 
     let mut extracted_headers = futures::future::join_all(headers_names
@@ -251,15 +272,15 @@ pub async fn init_upload_process(
         })).await;
     
     //=========================================================
-    let (path, file_size, file_name) = { 
+    let (uuid, file_size, file_name) = { 
         //TODO: FIX THIS unsafe unwrap
+        let uuid =      extracted_headers.pop().unwrap()?;
         let file_size = extracted_headers.pop().unwrap()?;
         let file_name = extracted_headers.pop().unwrap()?; 
 
         let _ = init_upload_process::validate_headers(&file_name)?;
         let _ = init_upload_process::validate_headers(&file_size)?;
-
-        let path = "./data"; // TODO: change path to const. 
+        let _ = init_upload_process::validate_headers(&uuid)?;
 
         // println!("file_size: {:?}", file_size);
 
@@ -272,25 +293,37 @@ pub async fn init_upload_process(
             .map_err(|e| HeaderErrors::HeaderUnwrapError(e))?
             .to_string(); 
 
-        (path, file_size, file_name)
+        
+        let uuid = uuid.to_str()
+            .map_err(|e| HeaderErrors::HeaderUnwrapError(e))?; 
+
+        let uuid = uuid::Uuid::from_str(uuid)?;
+
+        (uuid, file_size, file_name)
     };
     
-    let file_obj = FileObject::new(path, file_size as usize, file_name); 
-
     // let mut ext_file_obj = guard_with_error( file_obj, |e| { });
     // return error if stream is already present
-    let mut update_handle = ext
-        .entry(*(file_obj.get_uuid()).to_owned())
-        .or_insert(file_obj); 
+    let mut update_handle_entry = match ext
+        .entry(uuid) {
+            dashmap::mapref::entry::Entry::Occupied(mut file_obj) => { 
+                // Continue the update process
+                file_obj
+            },  
+            dashmap::mapref::entry::Entry::Vacant(val) => {
+                // The fileobj is missing from the uuid field
+                return Err(HeaderErrors::InvalidField(Cow::Borrowed("uuid")).into());
+            }
+        };
+        
+    let update_handle = update_handle_entry.get_mut();        
 
-    let _ = init_upload_process::streamer_writer(body, &mut update_handle).await?;
+    let _ = init_upload_process::streamer_writer(body, update_handle).await?;
 
     let response = { 
-
-        let uid = update_handle.get_uuid();
-        
+        let status = update_handle.get_state(); 
         let json = serde_json::json!({ 
-            "uid": uid
+            "status": status 
         });
 
         let json = serde_json::to_vec(&json).unwrap(); 
@@ -298,6 +331,7 @@ pub async fn init_upload_process(
         
         let resp = Response::builder()
             .status(200)
+            .header("Content-Type", "application/json")
             .body(json)?; 
 
         resp        
@@ -311,7 +345,7 @@ mod init_upload_process {
     use super::*;
     pub async fn streamer_writer(
         mut body: Body, 
-        handle: &mut dashmap::mapref::one::RefMut<'_, Uuid, FileObject>,
+        handle: &mut FileObject,
     ) -> Result<(), FragmentError> {
     
         let mut stream = body.into_data_stream();
@@ -376,18 +410,31 @@ mod init_upload_process {
 }
 
 //Resume the interrupted upload process
+//todo: apply the logic for removal of the FileObj from the JobHandle extension if error happens
 pub async fn resume_upload(
     Extension(ext): Extension<JobHandle>,
     req: Request<Body>
 ) -> Result<Response<String>, FragmentError> {
-
+    /*
+            Request: 
+                headers: 
+                    uuid: "xxxx-xxxx-xxxx-xxxx" // uuid to start this upload process from
+                    Content-Length: "..."   //give content-length of file
+                    Content-Pointer: "..."  //some position in the file
+                    
+                Body: 
+                    remaining_bytes: 128Mb,
+                    remaining_bytes: 128Mb,
+                    remaining_bytes: 128Mb,
+                    remaining_bytes: 128Mb,
+     */
     let (parts, body) = req.into_parts(); 
     let headers = parts.headers; 
 
     let headers_names = [
         "uuid",
         "Content-Length",
-        ""
+        "Content-Pointer"
     ];
 
     let mut extracted_headers = futures::future::join_all(headers_names
@@ -398,9 +445,167 @@ pub async fn resume_upload(
         })).await;
 
     
+    let (uuid, content_length, content_pointer) = { 
+        
+        let uuid = extracted_headers.pop().unwrap()?; 
+        let content_length = extracted_headers.pop().unwrap()?; 
+        let content_pointer = extracted_headers.pop().unwrap()?; 
+        
+        let _ = init_upload_process::validate_headers(&uuid)?;
+        let _ = init_upload_process::validate_headers(&content_length)?;
+        let _ = init_upload_process::validate_headers(&content_pointer)?;
+
+        // println!("file_size: {:?}", file_size);
+
+        let content_pointer = content_pointer.to_str()
+            .map_err(|e| HeaderErrors::HeaderUnwrapError(e))?
+            .parse::<u64>()
+            .map_err(|e| HeaderErrors::InvalidField(Cow::Borrowed("FileSize")))?;  
+
+        let content_length = content_length.to_str()
+            .map_err(|e| HeaderErrors::HeaderUnwrapError(e))?
+            .parse::<u64>()
+            .map_err(|e| HeaderErrors::InvalidField(Cow::Borrowed("FileSize")))?; 
+
+        
+        let uuid = uuid.to_str()
+            .map_err(|e| HeaderErrors::HeaderUnwrapError(e))?; 
+
+        let uuid = uuid::Uuid::from_str(uuid)?;
+
+        (uuid, content_length, content_pointer)
+    };
+
+    let mut update_handle_entry = match ext
+        .entry(uuid) {
+            dashmap::mapref::entry::Entry::Occupied(mut file_obj) => { 
+                // Continue the update process
+                file_obj
+            },  
+            dashmap::mapref::entry::Entry::Vacant(val) => {
+                // The fileobj is missing from the uuid field
+                return Err(HeaderErrors::InvalidField(Cow::Borrowed("uuid")).into());
+            }
+    };
+
+    let update_handle = update_handle_entry.get_mut(); 
+
+    //verify the logical validity of the content passed
+    resume_upload::validate_header_entries(update_handle, content_length, content_pointer)?;
+
+    //resume writing to file from the poitner onwards
 
 
-    Ok(Response::new("String".to_string()))
+
+
+    todo!()
+}
+
+mod resume_upload { 
+    use std::path::Path;
+
+    use tokio::{io::{BufWriter, AsyncSeekExt}, fs::File};
+
+    use super::*; 
+
+    pub fn validate_header_entries(
+        file_obj: &mut FileObject, 
+        content_length: u64, 
+        content_pointer: u64
+    ) -> Result<(), FragmentError> { 
+        
+        if (content_pointer as usize) >= file_obj.file_size { 
+            return Err(HeaderErrors::InvalidField(Cow::Borrowed(("content_pointer"))).into());
+        }
+        
+        if (content_length as usize) <= 0  {
+            return Err(HeaderErrors::InvalidField(Cow::Borrowed(("Content-Length"))).into());
+        }
+        
+        if (content_pointer as usize) <= 0  {
+            return Err(HeaderErrors::InvalidField(Cow::Borrowed(("Content-Pointer"))).into());
+        }
+
+        if (content_pointer as usize) <= 0  {
+            return Err(HeaderErrors::InvalidField(Cow::Borrowed(("Content-Pointer"))).into());
+        }
+
+        Ok(())
+    }
+
+    pub async fn streamer_writer(
+        mut body: Body, 
+        content_pointer: u64,
+        handle: &mut FileObject
+    ) -> Result<(), FragmentError> {
+        let mut stream = body.into_data_stream(); 
+
+        let previous_file_path = handle.output_file_path(); 
+
+        handle.set_state(UploadState::Resume((content_pointer) as usize));
+
+        let size = 10_000_000; //todo: modify this part to be fetched from 
+
+        let mut buf_writer = open_file(content_pointer, previous_file_path, size)
+            .await
+            .map_err(|e| {
+                handle.set_state(UploadState::Failed); 
+                e
+            })?; 
+
+        let mut chunk_counter = 0; 
+        let mut byte_counter = 0; 
+    
+        while let Some(chunk) = stream.next().await { 
+            
+            let bytes = chunk.map_err(|e| { 
+                handle.set_state(UploadState::Broken(((content_pointer as usize) + (byte_counter as usize))));
+                e
+            })?; 
+
+            byte_counter += buf_writer.write(&bytes).await.map_err(|e| { 
+                handle.set_state(UploadState::Broken(((content_pointer as usize) + (byte_counter as usize))));
+                e
+            })?;
+
+            chunk_counter += 1; 
+            handle.set_state(UploadState::Progress(byte_counter as usize));
+        }
+
+        //TODO: ensure & test the logical validity of the post checks performed
+
+        // we acquired more bytes than nessecary
+        if (byte_counter + content_pointer as usize) > handle.file_size { 
+            handle.set_state(UploadState::Broken(byte_counter));
+            return Err(HeaderErrors::FieldMismatch(Cow::Borrowed("Content-Length")).into()); 
+        }
+        // we got less bytes than possible 
+        if (byte_counter + content_pointer as usize) < handle.file_size { 
+            handle.set_state(UploadState::Broken(byte_counter));
+            return Err(HeaderErrors::FieldMismatch(Cow::Borrowed("Content-Length")).into());
+        }
+
+        drop(stream); 
+
+        let _ = buf_writer.shutdown().await.map_err(|e| {
+            handle.set_state(UploadState::Failed);
+            e
+        })?; 
+
+        handle.set_state(UploadState::Complete);
+        
+        Ok(())
+
+    }
+
+    async fn open_file(pointer: u64, path: impl AsRef<Path>, size: usize) -> Result<BufWriter<File>, FragmentError> {
+        let mut file = File::open(path).await?;
+        file.seek(std::io::SeekFrom::Start(pointer)).await; 
+        let buffered_file = BufWriter::with_capacity(size, file); 
+        
+        Ok(buffered_file)
+    }
+
 }
 
 // Handle for acquring the status of the In_progress, discarded or cancelled upload process 

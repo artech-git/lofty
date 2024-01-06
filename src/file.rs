@@ -103,5 +103,4 @@ pub enum UploadState {
 #[derive(Debug)]
 pub struct SharedFileState { 
     state: oneshot::Receiver<usize>,
-
 }
