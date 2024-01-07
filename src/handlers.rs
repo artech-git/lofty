@@ -124,7 +124,7 @@ mod schedule_upload_process {
     use crate::errors::BodyErrors;
 
     use super::*; 
-    use sysinfo::Disks; 
+    use sysinfo::{Disks, System, MemoryRefreshKind}; 
 
     pub type BodyContent = (String, u64);
 
@@ -165,7 +165,7 @@ mod schedule_upload_process {
          */
 
          let mut disks = Disks::new_with_refreshed_list();
-         for disk in disks { 
+         for disk in disks.iter() { 
             if disk.name() == "M" { //TODO: modify the storage behaviour
                 if disk.available_space() > allowed_threshold {
                     return Some(());
