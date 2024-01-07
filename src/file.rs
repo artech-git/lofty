@@ -15,7 +15,7 @@ pub struct FileObject {
     pub file_size: usize, 
     name: String, 
     uuid: Uuid, 
-    // hash: [u8; 256],
+    hash: Vec<u8>,
 }
 
 impl FileObject { 
@@ -23,15 +23,17 @@ impl FileObject {
     pub fn new(
         path: impl Into<PathBuf>, 
         size: usize, 
-        name: impl ToString
+        name: impl ToString, 
+        hash: Option<impl ToString>
     ) -> Self { 
+        let vec_hash = hash.map(|e| e.to_string().as_bytes().to_vec()).unwrap_or(vec![]); 
         Self { 
             path: path.into(),  
             state: UploadState::UnInit, 
             file_size: size, 
             name: name.to_string(),
             uuid: Uuid::new_v4(), 
-            // hash: [0_u8; 256]
+            hash: vec_hash
         }
     }
 
@@ -85,7 +87,6 @@ pub mod file_drop_handler {
 
 
 
-
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum UploadState {
     UnInit, 
@@ -102,5 +103,4 @@ pub enum UploadState {
 #[derive(Debug)]
 pub struct SharedFileState { 
     state: oneshot::Receiver<usize>,
-
 }

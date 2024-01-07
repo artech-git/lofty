@@ -146,8 +146,13 @@ pub enum ErrorStates {
 
     
     #[http(code = 404, message = "Missing Header Field")]
-    #[error("Missing header field")]
+    #[error(transparent)]
     RequestError(#[from] HeaderErrors<'static>),
+
+    
+    #[http(code = 404, message = "Incorrect body type")]
+    #[error(transparent)]
+    BodyContentError(#[from] BodyErrors<'static>),
 
     
     #[http(code = 500, message = "string parsing error")]
@@ -163,6 +168,11 @@ pub enum ErrorStates {
     #[http(code = 500, message = "Internal server error")]
     #[error("axum error")]
     AxumHttpError(#[from] axum::http::Error),
+
+    
+    #[http(code = 500, message = "Internal server error")]
+    #[error("Logical processing error")]
+    UndeclaredError,
 
     
     // #[http(code = 500, message = "server went into undesired mode")]
@@ -199,7 +209,18 @@ pub enum HeaderErrors<'a> {
     // InvalidField(Cow<'a, str>)
 }
 
+#[derive(Debug, thiserror::Error, HttpError)]
+pub enum BodyErrors<'a> { 
+    #[error("")]
+    MissingField(Cow<'a, str>),
 
+    #[error("Missing header value in field: {0:?}")]
+    MissingValueField(Cow<'a, str>),
+
+    #[error("Invalid values in field: {0:?}")]
+    InvalidValues(Cow<'a, str>),
+
+}
 // impl<'a, T> std::convert::From<T> for HeaderErrors<'a>
 // where T: std::error::Error { 
 
